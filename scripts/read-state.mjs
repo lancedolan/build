@@ -57,14 +57,14 @@ query($id: ID!, $after: String) {
 const PR_FIELDS = `
   id number url state merged mergedAt createdAt baseRefName headRefName headRefOid
   mergeCommit { oid parents(first: 2) { nodes { oid } } }
-  comments(first: 100) { ${PAGE} nodes { ${ISSUE_COMMENT} } }
-  reviewThreads(first: 100) { nodes { comments(first: 50) { nodes { databaseId url body createdAt author { login } } } } }`
+  comments(first: 20) { ${PAGE} nodes { ${ISSUE_COMMENT} } }
+  reviewThreads(first: 50) { nodes { comments(first: 10) { nodes { databaseId url body createdAt author { login } } } } }`
 
 // PRs are looked up by head branch name. Branch names go in as variables.
 export function prQuery(branches) {
   const vars = branches.map((_, i) => `$b${i}: String!`).join(', ')
   const fields = branches.map((_, i) => `
-    p${i}: pullRequests(headRefName: $b${i}, first: 20, states: [OPEN, MERGED, CLOSED], orderBy: {field: CREATED_AT, direction: DESC}) {
+    p${i}: pullRequests(headRefName: $b${i}, first: 5, states: [OPEN, MERGED, CLOSED], orderBy: {field: CREATED_AT, direction: DESC}) {
       nodes { ${PR_FIELDS} }
     }`).join('')
   return `query($owner: String!, $name: String!${vars ? `, ${vars}` : ''}) {
@@ -73,7 +73,7 @@ export function prQuery(branches) {
 }`
 }
 
-const PR_BATCH = 20
+export const PR_BATCH = 20
 
 async function allPages(gh, first, fetchPage) {
   const nodes = [...(first.nodes || [])]

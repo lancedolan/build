@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readState, computeStatus, pickPr, prQuery, main } from '../scripts/read-state.mjs'
+import { readState, computeStatus, pickPr, prQuery, main, SPEC_QUERY, PR_BATCH } from '../scripts/read-state.mjs'
 import { formatMarker } from '../scripts/lib/markers.mjs'
 import { loadJson, clone, fixtureGh, fixtureRunner } from './helpers.mjs'
 import { makeGh } from '../scripts/lib/gh.mjs'
@@ -165,6 +165,37 @@ test('PR lookups go in batches of 20 branches', async () => {
   await readState(makeGh(fixtureRunner(fx, { calls })), { repo: 'acme/shop', spec: 40 })
   const prCalls = calls.filter(c => c.input && c.input.includes('pullRequests(headRefName:'))
   assert.equal(prCalls.length, 2, '30 issue branches + the spec branch = 31 branches = 2 batches')
+})
+
+// GitHub's limit check: each `first: N` connection costs N times the product of the
+// `first:` values above it. GitHub refuses a query whose total is over 500,000.
+function maxNodes(query) {
+  let total = 0
+  const stack = [1]
+  for (let i = 0; i < query.length; i++) {
+    if (query[i] === '}') { stack.pop(); continue }
+    if (query[i] !== '{') continue
+    let mult = stack[stack.length - 1]
+    const before = query.slice(0, i).trimEnd()
+    if (before.endsWith(')')) {
+      const args = before.slice(before.lastIndexOf('('))
+      const first = args.match(/\bfirst:\s*(\d+)/)
+      if (first) { mult *= Number(first[1]); total += mult }
+    }
+    stack.push(mult)
+  }
+  return total
+}
+
+test('maxNodes matches the count GitHub reported for the old PR query', () => {
+  const q = 'p0: pullRequests(first: 20) { nodes { mergeCommit { parents(first: 2) { nodes { oid } } } comments(first: 100) { nodes { id } } reviewThreads(first: 100) { nodes { comments(first: 50) { nodes { id } } } } } }'
+  assert.equal(maxNodes(q) * 6, 624360)
+})
+
+test('queries stay under GitHub\'s 500,000 node limit', () => {
+  assert.ok(maxNodes(SPEC_QUERY) <= 500000, `SPEC_QUERY: ${maxNodes(SPEC_QUERY)}`)
+  const full = prQuery(Array.from({ length: PR_BATCH }, (_, i) => `b${i}`))
+  assert.ok(maxNodes(full) <= 500000, `prQuery with ${PR_BATCH} branches: ${maxNodes(full)}`)
 })
 
 test('prQuery passes branch names as variables, never inline', () => {
