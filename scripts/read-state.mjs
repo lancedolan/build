@@ -149,6 +149,13 @@ export function mergedWithMergeCommit(pr) {
   return parents.some(p => p.oid === pr.headRefOid)
 }
 
+// True when commit `ancestor` is in the history of commit `head`. The compare API says
+// "ahead" or "identical" when ancestor...head has nothing on the ancestor side.
+export function hasCommit(gh, owner, name, head, ancestor) {
+  const status = gh.run(['api', `repos/${owner}/${name}/compare/${ancestor}...${head}`, '--jq', '.status']).trim()
+  return status === 'ahead' || status === 'identical'
+}
+
 // A parent PR merged by squash or rebase, while a dependent branch still has the parent's original
 // commits. /build needs merge commits in human-in-loop=true mode and refuses to repair this.
 function findBadMerges(gh, owner, name, issues) {
@@ -158,9 +165,7 @@ function findBadMerges(gh, owner, name, issues) {
     for (const child of issues) {
       if (!child.blockedBy.includes(parent.number) || !child.branch.exists) continue
       if (child.pr && child.pr.merged) continue
-      // "ahead" or "identical": the child branch contains the parent PR's head commit.
-      const status = gh.run(['api', `repos/${owner}/${name}/compare/${parent.pr.headRefOid}...${child.branch.oid}`, '--jq', '.status']).trim()
-      if (status === 'ahead' || status === 'identical') {
+      if (hasCommit(gh, owner, name, child.branch.oid, parent.pr.headRefOid)) {
         out.push({ issue: parent.number, pr: parent.pr.number, dependent: child.number, branch: child.branch.name })
       }
     }

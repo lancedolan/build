@@ -35,7 +35,7 @@ function defaultResult(label, prompt) {
   if (role === 'rebaser') return { rebased: [], conflicts: [], verifyFailed: [] }
   if (role === 'recheck') return { affected: [], ...common() }
   if (role === 'git') {
-    if (prompt.includes('Check the parent PRs')) return { merged: [], notMergeCommit: [] }
+    if (prompt.includes('Check the parent PRs')) return { merged: [], badMerges: [], error: '' }
     if (n === 'spec') return prompt.includes('Final PR for spec') ? { ok: true, error: '', prNumber: 900 } : { ok: true, error: '' }
     return { ok: true, error: '', prNumber: 100 + Number(n), prUrl: `https://x/pull/${100 + Number(n)}` }
   }
@@ -166,7 +166,7 @@ test('diamond: C depends on unmerged A and B', async () => {
   assert.match(body, /Merge order: #141 \(issue #41\), then #142 \(issue #42\), then this PR\./)
   assert.match(body, /its diff also includes the changes from #141/)
   // Both open parents are checked before #43 starts.
-  assert.match(callFor(calls, '#43 git').prompt, /issue #41: PR #141[\s\S]*issue #42: PR #142/)
+  assert.match(callFor(calls, '#43 git').prompt, /--parents 41:141,42:142/)
 })
 
 test('humanInLoop false: merges into the spec branch, then opens the final PR', async () => {
@@ -508,7 +508,7 @@ function stackedOnOpen(branch42 = true) {
 const parentCheck = res => (l, prompt) => (prompt.includes('Check the parent PRs') ? res : undefined)
 
 test('parent merged with a merge commit: the stacked branch is used as is, no rebase', async () => {
-  const { out, calls, labels } = await run(makeArgs(stackedOnOpen(), { isRerun: true }), parentCheck({ merged: [41], notMergeCommit: [] }))
+  const { out, calls, labels } = await run(makeArgs(stackedOnOpen(), { isRerun: true }), parentCheck({ merged: [41], badMerges: [], error: '' }))
   assert.ok(!labels.some(l => l.endsWith('rebaser')))
   assert.match(callFor(calls, '#42 verifier r0 c1').prompt, /diff --stat pushed42 HEAD/)
   assert.equal(byNum(out)[41].outcome, 'merged')
@@ -516,7 +516,8 @@ test('parent merged with a merge commit: the stacked branch is used as is, no re
 })
 
 test('parent squash-merged under an existing branch: the issue stops with a blocker', async () => {
-  const { out, calls, labels } = await run(makeArgs(stackedOnOpen(), { isRerun: true }), parentCheck({ merged: [41], notMergeCommit: [41] }))
+  const { out, calls, labels } = await run(makeArgs(stackedOnOpen(), { isRerun: true, pluginRoot: '/p/build' }), parentCheck({ merged: [41], badMerges: [41], error: '' }))
+  assert.match(callFor(calls, '#42 git').prompt, /node \/p\/build\/scripts\/check-parents\.mjs --repo acme\/shop --branch build\/40-42 --parents 41:141/)
   assert.ok(!labels.includes('#42 scout'), 'no work on the branch')
   const r = byNum(out)[42]
   assert.equal(r.outcome, 'blocked')
@@ -527,7 +528,14 @@ test('parent squash-merged under an existing branch: the issue stops with a bloc
 })
 
 test('parent squash-merged before the issue has a branch: it starts from main', async () => {
-  const { out, calls } = await run(makeArgs(stackedOnOpen(false), { isRerun: true }), parentCheck({ merged: [41], notMergeCommit: [41] }))
+  // The script finds no branch, so it reports no bad merge.
+  const { out, calls } = await run(makeArgs(stackedOnOpen(false), { isRerun: true }), parentCheck({ merged: [41], badMerges: [], error: '' }))
   assert.match(callFor(calls, '#42 test-writer').prompt, /origin\/main/)
   assert.equal(byNum(out)[42].base, 'main')
+})
+
+test('a failed parent check stops the issue with a blocker', async () => {
+  const { out, labels } = await run(makeArgs(stackedOnOpen(), { isRerun: true }), parentCheck({ merged: [], badMerges: [], error: 'gh: HTTP 502' }))
+  assert.ok(!labels.includes('#42 scout'))
+  assert.match(byNum(out)[42].blocker.question, /Checking the parent PRs of issue #42 failed: gh: HTTP 502/)
 })

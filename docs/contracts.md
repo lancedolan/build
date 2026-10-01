@@ -15,6 +15,7 @@ agents/fallback-reviewer.md       agentType "build:fallback-reviewer"
 scripts/lib/*.mjs                 shared code (gh wrapper, markers, graph)
 scripts/startup-checks.mjs
 scripts/read-state.mjs
+scripts/check-parents.mjs         run by a workflow agent before each issue (human-in-loop=true)
 scripts/parse-transcripts.mjs
 scripts/build-report.mjs
 test/*.test.mjs, test/fixtures/   run with `npm test`
@@ -93,7 +94,7 @@ Agents write machine state into GitHub comments as one line: `<!-- build:<type> 
 
 Fields beyond the example: each issue also has `url` and `allPrs` (every PR from its branch: `number`, `state`, `merged`, `baseRefName`), and `specBranch.prs` lists PRs from the spec branch. Startup checks use these for the mode check. Each `pr.findings` entry also has `severity`, `round`, `detail` (comment text without markers), `url`, `status` (`open|argued|fixed|withdrawn`), `argued`, `argumentUrl`, and `fixedIn`. `pr.mergedWithMergeCommit` is `true` when the merge commit has the PR head as a parent, `false` for a squash or rebase merge, and `null` when not merged.
 
-`badMerges` lists merged PRs that were not merged with a merge commit while a dependent issue's unmerged branch still contains the PR's head commit (checked with the compare API). Startup checks refuse these in `human-in-loop=true` mode. /build never rebases a branch because its parent merged: in that mode stacked PRs must be merged with merge commits. If a parent PR is squash- or rebase-merged during a run, the workflow posts a type-1 blocker on each dependent issue that already has a branch.
+`badMerges` lists merged PRs that were not merged with a merge commit while a dependent issue's unmerged branch still contains the PR's head commit (checked with the compare API). Startup checks refuse these in `human-in-loop=true` mode. /build never rebases a branch because its parent merged: in that mode stacked PRs must be merged with merge commits. Before each issue, a `git` agent runs `check-parents.mjs --repo R --branch build/<spec>-<issue> --parents <issue>:<pr>,...` for the issue's open parent PRs. It prints `{"merged": [issues], "badMerges": [issues]}`, where `badMerges` are parents merged without a merge commit whose head is still on the issue's branch. A bad merge, or a failed check, posts a type-1 blocker on the issue.
 
 `status` is computed in code, in this priority order:
 1. `merged`: the PR is merged.
@@ -117,6 +118,7 @@ Fields beyond the example: each issue also has `url` and `allPrs` (every PR from
   "state": {},
   "worktree": "/abs/path/to/repo.build-40",
   "mainCheckout": "/abs/path/to/repo",
+  "pluginRoot": "/abs/path/to/plugin",
   "ports": {"base": 3110, "list": [3110, 3111, 3112]},
   "humanInLoop": true,
   "reportFile": "/Users/x/.claude/build/owner-repo-40/report.md",

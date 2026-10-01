@@ -58,6 +58,7 @@ It does nothing when the file already exists.
      "state": <contents of $DIR/state.json>,
      "worktree": "$WT",
      "mainCheckout": "$MAIN",
+     "pluginRoot": "${CLAUDE_PLUGIN_ROOT}",
      "ports": {"base": B, "list": [...]},
      "humanInLoop": <mode>,
      "reportFile": "$DIR/report.md",

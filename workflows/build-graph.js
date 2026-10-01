@@ -16,6 +16,7 @@ export const meta = {
 const S = args.state
 const WT = args.worktree
 const MAIN = args.mainCheckout
+const PLUGIN_ROOT = args.pluginRoot
 const HIL = args.humanInLoop !== false
 const SPEC = S.spec.number
 const REPO = S.repo
@@ -898,8 +899,8 @@ async function handleRebaseResult(res, items, phaseName) {
 
 const PARENT_CHECK_SCHEMA = {
   type: 'object',
-  required: ['merged', 'notMergeCommit'],
-  properties: { merged: { type: 'array', items: INT }, notMergeCommit: { type: 'array', items: INT } },
+  required: ['merged', 'badMerges', 'error'],
+  properties: { merged: { type: 'array', items: INT }, badMerges: { type: 'array', items: INT }, error: STR },
 }
 
 // Before each issue: a parent PR may have merged during this run. In true mode PRs must be merged
@@ -909,21 +910,25 @@ const PARENT_CHECK_SCHEMA = {
 async function checkMergedParents(n, phaseName) {
   const open = parentsOf(n).filter(p => results.get(p).outcome === 'done')
   if (!open.length) return
-  const listing = open.map(p => `- issue #${p}: PR #${results.get(p).pr}`).join('\n')
-  const res = await call(`#${n} git`, gitPrompt(`Check the parent PRs of issue #${n}:
-${listing}
-1. \`git -C ${WT} fetch origin\`.
-2. For each PR: \`gh pr view <number> -R ${REPO} --json state,headRefOid,mergeCommit\`. If state is MERGED, list its issue in merged.
-3. For each merged one: \`git -C ${WT} rev-list --parents -n 1 <mergeCommit.oid>\`. If headRefOid is not in that line (the PR was squashed or rebased, not merged with a merge commit), also list its issue in notMergeCommit.`,
-  'Return merged and notMergeCommit (issue numbers).'), { schema: PARENT_CHECK_SCHEMA, model: MODEL.git, phase: phaseName })
+  // The check is in scripts/check-parents.mjs. The agent only runs it.
+  const parents = open.map(p => `${p}:${results.get(p).pr}`).join(',')
+  const res = await call(`#${n} git`, gitPrompt(`Check the parent PRs of issue #${n}: run \`node ${PLUGIN_ROOT}/scripts/check-parents.mjs --repo ${REPO} --branch ${branchOf(n)} --parents ${parents}\`.`,
+  'Return its merged and badMerges fields exactly as printed, and error: "". If it exits non-zero, return merged: [], badMerges: [], and error: its output word for word.'), { schema: PARENT_CHECK_SCHEMA, model: MODEL.git, phase: phaseName })
+  if (res.error) {
+    await failWithBlocker(n, {
+      type: 1, scope: 'branch',
+      question: `Checking the parent PRs of issue #${n} failed: ${res.error}`,
+      options: ['A) Fix the cause, then rerun /build'],
+      recommendation: 'A',
+    }, phaseName)
+  }
   for (const m of res.merged) {
     const r = results.get(m)
     if (r) r.outcome = 'merged'
   }
-  const iss = issues.get(n)
-  const bad = res.notMergeCommit.filter(p => open.includes(p))
-  // With no branch yet, the issue simply starts from the default branch.
-  if (!bad.length || !(iss.branch && iss.branch.exists)) return
+  // The script only reports a bad merge when this issue's branch still has the parent's commits.
+  const bad = res.badMerges.filter(p => open.includes(p))
+  if (!bad.length) return
   await failWithBlocker(n, {
     type: 1, scope: 'branch',
     question: badMergeText(bad.map(p => ({ issue: p, pr: results.get(p).pr })), n),
