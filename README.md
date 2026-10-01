@@ -11,7 +11,7 @@ For each sub-issue, in dependency order:
 
 The run stops on an issue only for a listed blocker, such as a new dependency, a security change, or a contradiction in the spec. The other issues keep going. At the end, one comment on the spec issue lists every judgment call, recommendation, finding that was argued away, blocker, and agent, with each agent's context token count.
 
-The full spec is [issue #1](https://github.com/lancedolan/build/issues/1). The data shapes shared between the parts are in [docs/contracts.md](docs/contracts.md).
+The original spec is captured in [issue #1](https://github.com/lancedolan/build/issues/1). The data shapes shared between the parts are in [docs/contracts.md](docs/contracts.md).
 
 ## Install
 
