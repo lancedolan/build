@@ -1,0 +1,65 @@
+[
+  {
+    "variables": {
+      "owner": "lancedolan",
+      "name": "build",
+      "spec": 1,
+      "refQuery": "build/1-"
+    },
+    "response": {
+      "data": {
+        "repository": {
+          "nameWithOwner": "lancedolan/build",
+          "deleteBranchOnMerge": false,
+          "viewerPermission": "ADMIN",
+          "defaultBranchRef": null,
+          "refs": {
+            "pageInfo": {
+              "hasNextPage": false,
+              "endCursor": null
+            },
+            "nodes": []
+          },
+          "issue": {
+            "id": "I_kwDOU1_95M8AAAABUQA38g",
+            "number": 1,
+            "title": "/build: work a spec's issue graph into one PR per issue, autonomously",
+            "body": "## Goal\n\n`/build <spec#> [human-in-loop]` takes a spec issue and its graph of sub-issues (made by `/to-spec` + `/break-down`) and works the whole graph with no human in the loop. It ends with one PR p",
+            "url": "https://github.com/lancedolan/build/issues/1",
+            "state": "OPEN",
+            "comments": {
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              },
+              "nodes": []
+            },
+            "subIssues": {
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              },
+              "nodes": []
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "variables": {
+      "owner": "lancedolan",
+      "name": "build",
+      "b0": "build/1-spec"
+    },
+    "response": {
+      "data": {
+        "repository": {
+          "p0": {
+            "nodes": []
+          }
+        }
+      }
+    }
+  }
+]

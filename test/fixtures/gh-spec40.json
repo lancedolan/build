@@ -1,0 +1,465 @@
+{
+  "spec": {
+    "data": {
+      "repository": {
+        "nameWithOwner": "acme/shop",
+        "deleteBranchOnMerge": true,
+        "viewerPermission": "WRITE",
+        "defaultBranchRef": {
+          "name": "main",
+          "target": {
+            "oid": "mainoid1"
+          }
+        },
+        "refs": {
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          },
+          "nodes": [
+            {
+              "name": "build/40-42",
+              "target": {
+                "oid": "oid42"
+              }
+            },
+            {
+              "name": "build/40-45",
+              "target": {
+                "oid": "oid45"
+              }
+            }
+          ]
+        },
+        "issue": {
+          "id": "I_40",
+          "number": 40,
+          "title": "Spending chart",
+          "body": "Spec body",
+          "url": "https://github.com/acme/shop/issues/40",
+          "state": "OPEN",
+          "comments": {
+            "pageInfo": {
+              "hasNextPage": false,
+              "endCursor": null
+            },
+            "nodes": [
+              {
+                "databaseId": 9001,
+                "url": "https://github.com/acme/shop/issues/x#issuecomment-9001",
+                "body": "<!-- build:report -->\n<!-- build:run {\"humanInLoop\":true,\"startOid\":\"aaa111\",\"stopped\":null,\"resetsAt\":null} -->\n<!-- build:agent-ids [\"old0000001\",\"old0000002\"] -->\n## Build report for #40\n\nStatus: blocked\n\n### Judgment calls\n\n- #41 implementer: named the helper formatTotal\n- #42 test-writer: skipped a styling test, no e2e framework\n\n### Recommendations\n\n- #42 test-writer: add an e2e framework\n\n### Agents\n\n| Issue | Role | Round | Context tokens |\n|---|---|---|---|\n| #41 | scout |  | 12,000 |\n| #41 | implementer | r0 | 40,500 |",
+                "createdAt": "2026-09-20T10:00:00Z",
+                "author": {
+                  "login": "build-bot"
+                }
+              },
+              {
+                "databaseId": 9002,
+                "url": "https://github.com/acme/shop/issues/x#issuecomment-9002",
+                "body": "Decision: use the brand colors from the style guide",
+                "createdAt": "2026-09-21T10:00:00Z",
+                "author": {
+                  "login": "lance"
+                }
+              },
+              {
+                "databaseId": 9003,
+                "url": "https://github.com/acme/shop/issues/x#issuecomment-9003",
+                "body": "Just a note, no decision here",
+                "createdAt": "2026-09-21T11:00:00Z",
+                "author": {
+                  "login": "lance"
+                }
+              }
+            ]
+          },
+          "subIssues": {
+            "pageInfo": {
+              "hasNextPage": false,
+              "endCursor": null
+            },
+            "nodes": [
+              {
+                "id": "I_41",
+                "number": 41,
+                "title": "Totals helper",
+                "body": "Body of #41",
+                "state": "OPEN",
+                "url": "https://github.com/acme/shop/issues/41",
+                "repository": {
+                  "nameWithOwner": "acme/shop"
+                },
+                "blockedBy": {
+                  "nodes": []
+                },
+                "comments": {
+                  "pageInfo": {
+                    "hasNextPage": false,
+                    "endCursor": null
+                  },
+                  "nodes": [
+                    {
+                      "databaseId": 9004,
+                      "url": "https://github.com/acme/shop/issues/x#issuecomment-9004",
+                      "body": "Done.\n<!-- build:done {\"issue\":41,\"pr\":46} -->",
+                      "createdAt": "2026-09-19T10:00:00Z",
+                      "author": {
+                        "login": "build-bot"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "I_42",
+                "number": 42,
+                "title": "Chart data",
+                "body": "Body of #42",
+                "state": "OPEN",
+                "url": "https://github.com/acme/shop/issues/42",
+                "repository": {
+                  "nameWithOwner": "acme/shop"
+                },
+                "blockedBy": {
+                  "nodes": [
+                    {
+                      "number": 41,
+                      "repository": {
+                        "nameWithOwner": "acme/shop"
+                      }
+                    }
+                  ]
+                },
+                "comments": {
+                  "pageInfo": {
+                    "hasNextPage": false,
+                    "endCursor": null
+                  },
+                  "nodes": [
+                    {
+                      "databaseId": 9005,
+                      "url": "https://github.com/acme/shop/issues/x#issuecomment-9005",
+                      "body": "Tests committed.\n<!-- build:progress {\"issue\":42,\"step\":\"tests-committed\",\"round\":0,\"commit\":\"test42\",\"pr\":null} -->",
+                      "createdAt": "2026-09-19T11:00:00Z",
+                      "author": {
+                        "login": "build-bot"
+                      }
+                    },
+                    {
+                      "databaseId": 9006,
+                      "url": "https://github.com/acme/shop/issues/x#issuecomment-9006",
+                      "body": "Done.\n<!-- build:done {\"issue\":42,\"pr\":47} -->",
+                      "createdAt": "2026-09-19T12:00:00Z",
+                      "author": {
+                        "login": "build-bot"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "I_43",
+                "number": 43,
+                "title": "Chart view",
+                "body": "Body of #43",
+                "state": "OPEN",
+                "url": "https://github.com/acme/shop/issues/43",
+                "repository": {
+                  "nameWithOwner": "acme/shop"
+                },
+                "blockedBy": {
+                  "nodes": [
+                    {
+                      "number": 41,
+                      "repository": {
+                        "nameWithOwner": "acme/shop"
+                      }
+                    }
+                  ]
+                },
+                "comments": {
+                  "pageInfo": {
+                    "hasNextPage": false,
+                    "endCursor": null
+                  },
+                  "nodes": [
+                    {
+                      "databaseId": 9007,
+                      "url": "https://github.com/acme/shop/issues/x#issuecomment-9007",
+                      "body": "Blocked.\n<!-- build:blocker {\"issue\":43,\"type\":3,\"scope\":\"branch\",\"question\":\"needs a new charting library the spec didn't name.\",\"options\":[\"A) add recharts\",\"B) draw with plain SVG\"],\"recommendation\":\"B\"} -->",
+                      "createdAt": "2026-09-19T13:00:00Z",
+                      "author": {
+                        "login": "build-bot"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "I_44",
+                "number": 44,
+                "title": "Chart totals",
+                "body": "Body of #44",
+                "state": "OPEN",
+                "url": "https://github.com/acme/shop/issues/44",
+                "repository": {
+                  "nameWithOwner": "acme/shop"
+                },
+                "blockedBy": {
+                  "nodes": [
+                    {
+                      "number": 42,
+                      "repository": {
+                        "nameWithOwner": "acme/shop"
+                      }
+                    },
+                    {
+                      "number": 43,
+                      "repository": {
+                        "nameWithOwner": "acme/shop"
+                      }
+                    }
+                  ]
+                },
+                "comments": {
+                  "pageInfo": {
+                    "hasNextPage": false,
+                    "endCursor": null
+                  },
+                  "nodes": [
+                    {
+                      "databaseId": 9008,
+                      "url": "https://github.com/acme/shop/issues/x#issuecomment-9008",
+                      "body": "Blocked.\n<!-- build:blocker {\"issue\":44,\"type\":1,\"scope\":\"branch\",\"question\":\"The spec says totals round down; the code rounds half up.\",\"options\":[\"A) round down\",\"B) keep half up\"],\"recommendation\":\"A\"} -->",
+                      "createdAt": "2026-09-19T14:00:00Z",
+                      "author": {
+                        "login": "build-bot"
+                      }
+                    },
+                    {
+                      "databaseId": 9009,
+                      "url": "https://github.com/acme/shop/issues/x#issuecomment-9009",
+                      "body": "Decision: A",
+                      "createdAt": "2026-09-22T09:00:00Z",
+                      "author": {
+                        "login": "lance"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "I_45",
+                "number": 45,
+                "title": "Chart legend",
+                "body": "Body of #45",
+                "state": "OPEN",
+                "url": "https://github.com/acme/shop/issues/45",
+                "repository": {
+                  "nameWithOwner": "acme/shop"
+                },
+                "blockedBy": {
+                  "nodes": [
+                    {
+                      "number": 44,
+                      "repository": {
+                        "nameWithOwner": "acme/shop"
+                      }
+                    }
+                  ]
+                },
+                "comments": {
+                  "pageInfo": {
+                    "hasNextPage": false,
+                    "endCursor": null
+                  },
+                  "nodes": [
+                    {
+                      "databaseId": 9010,
+                      "url": "https://github.com/acme/shop/issues/x#issuecomment-9010",
+                      "body": "Tests committed.\n<!-- build:progress {\"issue\":45,\"step\":\"tests-committed\",\"round\":0,\"commit\":\"test45\",\"pr\":null} -->",
+                      "createdAt": "2026-09-19T15:00:00Z",
+                      "author": {
+                        "login": "build-bot"
+                      }
+                    },
+                    {
+                      "databaseId": 9011,
+                      "url": "https://github.com/acme/shop/issues/x#issuecomment-9011",
+                      "body": "Code pushed.\n<!-- build:progress {\"issue\":45,\"step\":\"code-pushed\",\"round\":0,\"commit\":\"code45\",\"pr\":null} -->",
+                      "createdAt": "2026-09-19T16:00:00Z",
+                      "author": {
+                        "login": "build-bot"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "prs": {
+    "build/40-41": [
+      {
+        "id": "PR_46",
+        "number": 46,
+        "url": "https://github.com/acme/shop/pull/46",
+        "state": "MERGED",
+        "merged": true,
+        "mergedAt": "2026-09-23T10:00:00Z",
+        "createdAt": "2026-09-19T12:00:00Z",
+        "baseRefName": "main",
+        "headRefName": "build/40-41",
+        "headRefOid": "head46",
+        "comments": {
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          },
+          "nodes": []
+        },
+        "reviewThreads": {
+          "nodes": []
+        }
+      }
+    ],
+    "build/40-42": [
+      {
+        "id": "PR_47",
+        "number": 47,
+        "url": "https://github.com/acme/shop/pull/47",
+        "state": "OPEN",
+        "merged": false,
+        "mergedAt": null,
+        "createdAt": "2026-09-19T12:00:00Z",
+        "baseRefName": "build/40-41",
+        "headRefName": "build/40-42",
+        "headRefOid": "head47",
+        "comments": {
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          },
+          "nodes": [
+            {
+              "databaseId": 9012,
+              "url": "https://github.com/acme/shop/issues/x#issuecomment-9012",
+              "body": "Possible null deref in mapTotals.\n<!-- build:finding {\"id\":\"build:fallback-reviewer-r1-1\",\"reviewer\":\"build:fallback-reviewer\",\"round\":1,\"severity\":\"medium\",\"title\":\"null deref in mapTotals\"} -->",
+              "createdAt": "2026-09-19T12:10:00Z",
+              "author": {
+                "login": "reviewer"
+              }
+            },
+            {
+              "databaseId": 9013,
+              "url": "https://github.com/acme/shop/issues/x#issuecomment-9013",
+              "body": "Rounding is wrong.\n<!-- build:finding {\"id\":\"build:fallback-reviewer-r1-2\",\"reviewer\":\"build:fallback-reviewer\",\"round\":1,\"severity\":\"medium\",\"title\":\"rounding\"} -->",
+              "createdAt": "2026-09-19T12:11:00Z",
+              "author": {
+                "login": "reviewer"
+              }
+            },
+            {
+              "databaseId": 9014,
+              "url": "https://github.com/acme/shop/issues/x#issuecomment-9014",
+              "body": "Name is unclear.\n<!-- build:finding {\"id\":\"build:fallback-reviewer-r1-3\",\"reviewer\":\"build:fallback-reviewer\",\"round\":1,\"severity\":\"medium\",\"title\":\"unclear name\"} -->",
+              "createdAt": "2026-09-19T12:12:00Z",
+              "author": {
+                "login": "reviewer"
+              }
+            },
+            {
+              "databaseId": 9015,
+              "url": "https://github.com/acme/shop/issues/x#issuecomment-9015",
+              "body": "Re build:fallback-reviewer-r1-1: fixed in fix1.\n<!-- build:reply {\"finding\":\"build:fallback-reviewer-r1-1\",\"action\":\"fixed\",\"commit\":\"fix1\"} -->",
+              "createdAt": "2026-09-19T12:20:00Z",
+              "author": {
+                "login": "build-bot"
+              }
+            },
+            {
+              "databaseId": 9016,
+              "url": "https://github.com/acme/shop/issues/x#issuecomment-9016",
+              "body": "Re build:fallback-reviewer-r1-2: argued. The spec says round half up.\n<!-- build:reply {\"finding\":\"build:fallback-reviewer-r1-2\",\"action\":\"argued\",\"commit\":null} -->",
+              "createdAt": "2026-09-19T12:21:00Z",
+              "author": {
+                "login": "build-bot"
+              }
+            },
+            {
+              "databaseId": 9017,
+              "url": "https://github.com/acme/shop/issues/x#issuecomment-9017",
+              "body": "Re build:fallback-reviewer-r1-3: argued. The name matches the domain term.\n<!-- build:reply {\"finding\":\"build:fallback-reviewer-r1-3\",\"action\":\"argued\",\"commit\":null} -->",
+              "createdAt": "2026-09-19T12:22:00Z",
+              "author": {
+                "login": "build-bot"
+              }
+            },
+            {
+              "databaseId": 9018,
+              "url": "https://github.com/acme/shop/issues/x#issuecomment-9018",
+              "body": "withdrawn: the spec does say half up.\n<!-- build:verdict {\"finding\":\"build:fallback-reviewer-r1-2\",\"verdict\":\"withdrawn\"} -->",
+              "createdAt": "2026-09-19T12:30:00Z",
+              "author": {
+                "login": "reviewer"
+              }
+            },
+            {
+              "databaseId": 9019,
+              "url": "https://github.com/acme/shop/issues/x#issuecomment-9019",
+              "body": "still stands.\n<!-- build:verdict {\"finding\":\"build:fallback-reviewer-r1-3\",\"verdict\":\"stands\"} -->",
+              "createdAt": "2026-09-19T12:31:00Z",
+              "author": {
+                "login": "reviewer"
+              }
+            }
+          ]
+        },
+        "reviewThreads": {
+          "nodes": [
+            {
+              "comments": {
+                "nodes": [
+                  {
+                    "databaseId": 77,
+                    "url": "https://github.com/acme/shop/pull/47#discussion_r77",
+                    "body": "Inline: magic number.\n<!-- build:finding {\"id\":\"build:fallback-reviewer-r1-4\",\"reviewer\":\"build:fallback-reviewer\",\"round\":1,\"severity\":\"medium\",\"title\":\"magic number\"} -->",
+                    "createdAt": "2026-09-19T12:13:00Z",
+                    "author": {
+                      "login": "reviewer"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "PR_40",
+        "number": 40,
+        "url": "https://github.com/acme/shop/pull/40",
+        "state": "CLOSED",
+        "merged": false,
+        "mergedAt": null,
+        "createdAt": "2026-09-01T00:00:00Z",
+        "baseRefName": "main",
+        "headRefName": "build/40-42",
+        "headRefOid": "head40",
+        "comments": {
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          },
+          "nodes": []
+        },
+        "reviewThreads": {
+          "nodes": []
+        }
+      }
+    ]
+  }
+}

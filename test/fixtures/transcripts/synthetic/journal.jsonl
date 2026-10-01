@@ -1,0 +1,9 @@
+{"type":"launched"}
+{"type":"started","key":"k-aimpl0000001","agentId":"aimpl0000001","label":"#41 implementer r1"}
+{"type":"result","key":"k-aimpl0000001","agentId":"aimpl0000001","result":{}}
+{"type":"started","key":"k-aver00000002","agentId":"aver00000002","label":"#41 verifier r0 c2"}
+{"type":"result","key":"k-aver00000002","agentId":"aver00000002","result":{}}
+{"type":"started","key":"k-arech0000003","agentId":"arech0000003","label":"#spec recheck"}
+{"type":"result","key":"k-arech0000003","agentId":"arech0000003","result":{}}
+{"type":"started","key":"k-arev00000004","agentId":"arev00000004","label":"#41 review:build:fallback-reviewer r2"}
+{"type":"result","key":"k-arev00000004","agentId":"arev00000004","result":{}}

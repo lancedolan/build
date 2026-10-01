@@ -1,0 +1,3 @@
+{"type": "launched"}
+{"type": "started", "key": "v2:6f50c159d4835433dac1d30a4dcddbc8524811d99ae017f4f79e2abd33ec9922", "agentId": "a65aca8b3733d8233", "label": "nest-test"}
+{"type": "result", "key": "v2:6f50c159d4835433dac1d30a4dcddbc8524811d99ae017f4f79e2abd33ec9922", "agentId": "a65aca8b3733d8233", "result": {"trimmed": true}}

@@ -1,0 +1,12 @@
+{
+  "name": "lancedolan-build",
+  "description": "The /build plugin: spec issue to one PR per sub-issue.",
+  "owner": { "name": "Lance Dolan" },
+  "plugins": [
+    {
+      "name": "build",
+      "source": "./",
+      "description": "Work a spec issue's graph of sub-issues into one PR per sub-issue."
+    }
+  ]
+}
