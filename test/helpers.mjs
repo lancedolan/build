@@ -47,6 +47,11 @@ export function fixtureRunner(fixture, { extra, calls = [] } = {}) {
       throw new Error(`fixtureRunner: unknown query ${query.slice(0, 80)}`)
     }
     if (args[0] === 'auth' && args[1] === 'status') return { status: 0, stdout: '', stderr: 'Logged in' }
+    // compare API: fixture.compare maps "base...head" to a status.
+    if (args[0] === 'api' && args[1].includes('/compare/') && fixture.compare) {
+      const key = args[1].split('/compare/')[1]
+      if (key in fixture.compare) return { status: 0, stdout: `${fixture.compare[key]}\n`, stderr: '' }
+    }
     if (args[0] === 'repo' && args[1] === 'view') return ok({ nameWithOwner: fixture.spec.data.repository.nameWithOwner })
     throw new Error(`fixtureRunner: unexpected gh ${args.join(' ')}`)
   }

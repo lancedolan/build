@@ -31,7 +31,7 @@ Scripts are Node 20+ ESM with no npm dependencies. They call `gh` through `scrip
 - Report file: `~/.claude/build/<owner>-<repo>-<spec>/report.md`.
 - Agent labels, which the transcript parser splits into issue, role, round:
   - `#<issue> <role>` or `#<issue> <role> r<round>`. Roles: `scout`, `test-writer`, `implementer`, `verifier`, `review:<agentType>`, `merger`, `rebaser`, `git` (mechanical push, PR, and comment steps; Haiku), `decision-reader` (reads the `Decision:` answer to a type-8 blocker; Sonnet).
-  - Run-level agents use `#spec <role>`: `#spec start-verifier`, `#spec recheck`, `#spec rebaser`, `#spec git`.
+  - Run-level agents use `#spec <role>`: `#spec start-verifier`, `#spec recheck`, `#spec git`.
   - Round is the review round (0 = before review). The verify-repair cycle is `c<n>` after the round: `#41 verifier r0 c2`.
 
 ## Hidden markers
@@ -44,13 +44,12 @@ Agents write machine state into GitHub comments as one line: `<!-- build:<type> 
 | `reply` | PR comment by implementer | `{"finding":"<id>","action":"fixed\|argued","commit":"<sha or null>"}` |
 | `verdict` | PR comment by the reviewer that raised the finding | `{"finding":"<id>","verdict":"withdrawn\|stands"}` |
 | `blocker` | sub-issue comment (graph scope: spec issue comment) | `{"issue":n,"type":1-8,"scope":"branch\|graph","question":"...","options":["A) ...","B) ..."],"recommendation":"..."}` |
-| `progress` | sub-issue comment | `{"issue":n,"step":"tests-committed\|code-pushed\|pr-opened\|review-round\|rebased\|merged","round":n,"commit":"<sha>","pr":n\|null}` |
+| `progress` | sub-issue comment | `{"issue":n,"step":"tests-committed\|code-pushed\|pr-opened\|review-round\|merged","round":n,"commit":"<sha>","pr":n\|null}` |
 | `interrupted` | sub-issue comment | `{"issue":n,"lastStep":"<step or null>"}` |
 | `done` | sub-issue comment | `{"issue":n,"pr":n}`, or `{"issue":n,"pr":null}` when a Decision said to treat a closed issue as done |
 | `agent-ids` | inside the report comment | `["<first 10 chars of agentId>", ...]`, so a rebuilt report doesn't list the same agent twice |
 | `run` | inside the report comment | `{"humanInLoop":bool,"startOid":"<sha of starting branch when last verified>","stopped":null\|"usage-limit"\|"graph-blocker","resetsAt":null\|"..."}` |
 
-- A `rebased` progress marker is posted by a rebaser after it pushes a rebased branch whose tests pass. It records the new head commit but is not a step: resume uses the newest other step, and the verifier's test diff starts at the newest `code-pushed`, `pr-opened`, `review-round`, or `rebased` commit.
 - A finding is open until a later `verdict` with `withdrawn`, or a `reply` with `action: fixed` that no later `verdict: stands` overrides.
 - Blocker types 1-7 are the spec's list. Type 8 is "the sub-issue was closed by hand with no merged PR". Only the workflow script raises type 8, always with `branch` scope. Agents return types 1-7.
 - A blocker is answered when a `Decision:` comment on the same issue is newer than the blocker marker.
@@ -87,11 +86,14 @@ Agents write machine state into GitHub comments as one line: `<!-- build:<type> 
     }
   ],
   "order": [41, 42, 43],
-  "graphErrors": []
+  "graphErrors": [],
+  "badMerges": [{"issue": 41, "pr": 46, "dependent": 42, "branch": "build/40-42"}]
 }
 ```
 
-Fields beyond the example: each issue also has `url` and `allPrs` (every PR from its branch: `number`, `state`, `merged`, `baseRefName`), and `specBranch.prs` lists PRs from the spec branch. Startup checks use these for the mode check. Each `pr.findings` entry also has `severity`, `round`, `detail` (comment text without markers), `url`, `status` (`open|argued|fixed|withdrawn`), `argued`, `argumentUrl`, and `fixedIn`.
+Fields beyond the example: each issue also has `url` and `allPrs` (every PR from its branch: `number`, `state`, `merged`, `baseRefName`), and `specBranch.prs` lists PRs from the spec branch. Startup checks use these for the mode check. Each `pr.findings` entry also has `severity`, `round`, `detail` (comment text without markers), `url`, `status` (`open|argued|fixed|withdrawn`), `argued`, `argumentUrl`, and `fixedIn`. `pr.mergedWithMergeCommit` is `true` when the merge commit has the PR head as a parent, `false` for a squash or rebase merge, and `null` when not merged.
+
+`badMerges` lists merged PRs that were not merged with a merge commit while a dependent issue's unmerged branch still contains the PR's head commit (checked with the compare API). Startup checks refuse these in `human-in-loop=true` mode. /build never rebases a branch because its parent merged: in that mode stacked PRs must be merged with merge commits. If a parent PR is squash- or rebase-merged during a run, the workflow posts a type-1 blocker on each dependent issue that already has a branch.
 
 `status` is computed in code, in this priority order:
 1. `merged`: the PR is merged.

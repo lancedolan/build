@@ -3,7 +3,7 @@ export const meta = {
   description: 'Work a spec issue graph into one PR per sub-issue: tests first, verify, adversarial review',
   whenToUse: 'Started by the /build skill with args from read-state.mjs. Not meant to be run by hand.',
   phases: [
-    { title: 'Startup', detail: 'verify the starting code, recheck answered PRs, rebase stacked PRs' },
+    { title: 'Startup', detail: 'verify the starting code, recheck answered PRs' },
     { title: 'Finish', detail: 'open the spec-branch PR when human-in-loop=false' },
   ],
 }
@@ -138,13 +138,9 @@ const RECHECK_SCHEMA = withCommon({
 }, ['affected'])
 const REBASE_SCHEMA = {
   type: 'object',
-  required: ['rebased', 'conflicts', 'mergedParents', 'verifyFailed'],
+  required: ['rebased', 'conflicts', 'verifyFailed'],
   properties: {
-    rebased: {
-      type: 'array',
-      items: { type: 'object', required: ['issue', 'headCommit'], properties: { issue: INT, headCommit: STR } },
-    },
-    mergedParents: { type: 'array', items: INT },
+    rebased: { type: 'array', items: INT },
     verifyFailed: { type: 'array', items: INT },
     conflicts: {
       type: 'array',
@@ -168,8 +164,6 @@ const MERGE_SCHEMA = {
 const issues = new Map(S.issues.map(i => [i.number, i]))
 const results = new Map()
 const rebuildReasons = new Map()
-// Issue number -> branch head after a rebase in this run. The old verified commits are no longer in its history.
-const rebasedHeads = new Map()
 const notes = []
 let agentCount = 0
 let stopped = null
@@ -287,17 +281,15 @@ function branchPlan(n) {
 }
 
 function resumePoint(issue) {
-  // A rebased marker records a new commit but not a new step.
-  const prog = lastMarker(issue.markers, 'progress', m => m.data.step !== 'rebased')
+  const prog = lastMarker(issue.markers, 'progress')
   const intr = lastMarker(issue.markers, 'interrupted')
   let step = prog ? prog.data.step : null
   if (intr && intr.data.lastStep && (!prog || isAfter(intr.createdAt, prog.createdAt))) step = intr.data.lastStep
   const tests = lastMarker(issue.markers, 'progress', m => m.data.step === 'tests-committed')
   const round = lastMarker(issue.markers, 'progress', m => m.data.step === 'review-round')
   // code-pushed, pr-opened, and review-round markers are only posted after a verifier passed
-  // that commit, test diff included. So test changes up to it are already approved. A rebased
-  // marker holds the same approved commits, replayed onto a new base, with all tests passing.
-  const verified = lastMarker(issue.markers, 'progress', m => ['code-pushed', 'pr-opened', 'review-round', 'rebased'].includes(m.data.step))
+  // that commit, test diff included. So test changes up to it are already approved.
+  const verified = lastMarker(issue.markers, 'progress', m => ['code-pushed', 'pr-opened', 'review-round'].includes(m.data.step))
   return {
     at: step ? STEPS.indexOf(step) : -1,
     testCommit: tests ? tests.data.commit : null,
@@ -798,7 +790,6 @@ async function workIssue(issue, rebuildReason) {
   if (HIL) await checkMergedParents(n, phaseName)
 
   const resume = rebuildReason ? { at: -1, testCommit: null, verifiedCommit: null, lastRound: 0 } : resumePoint(issue)
-  if (!rebuildReason && rebasedHeads.has(n)) resume.verifiedCommit = rebasedHeads.get(n)
   const openPr = issue.pr && issue.pr.state === 'OPEN' ? issue.pr.number : null
   const ctx = {
     n, issue,
@@ -842,7 +833,7 @@ async function workIssue(issue, rebuildReason) {
     await verifyLoop(ctx, 0, phaseName)
     await publish(ctx, 'See the issue for the full description.', phaseName)
   } else {
-    ctx.head = rebasedHeads.get(n) || issue.pr.headRefOid
+    ctx.head = issue.pr.headRefOid
   }
 
   if (resume.at < STEPS.indexOf('merged')) {
@@ -864,32 +855,25 @@ async function workIssue(issue, rebuildReason) {
 function rebaseSteps(items) {
   return items.map((it, i) => `${i + 1}. Issue #${it.issue}, branch \`${it.branch}\` (PR #${it.pr}):
    - \`git -C ${WT} fetch origin\`. If \`${it.oldBase}\` is not an ancestor of \`origin/${it.branch}\` (\`git merge-base --is-ancestor\`), skip it: nothing to do.
-   - Otherwise: \`git -C ${WT} checkout -B ${it.branch} origin/${it.branch}\`, then \`git -C ${WT} rebase --onto ${it.onto} ${it.oldBase} ${it.branch}\`. This drops the old parent's commits and works no matter how the parent was merged.
+   - Otherwise: \`git -C ${WT} checkout -B ${it.branch} origin/${it.branch}\`, then \`git -C ${WT} rebase --onto ${it.onto} ${it.oldBase} ${it.branch}\`. This replaces the old parent commits with the new ones.
    - On a conflict: \`git rebase --abort\`, list it in conflicts with a short detail, move on.
    - Run the repo's build and every test suite (find the commands in AGENTS.md and package files). If anything fails, list the issue in verifyFailed and DON'T push it.
    - Otherwise push: \`git -C ${WT} push --force-with-lease=${it.branch}:${it.expectHead} origin ${it.branch}\`.
-   - ${commentStep(`issue #${it.issue} (\`gh issue comment\`)`, `Rebased \`${it.branch}\` onto \`${it.onto}\`.\n\n${markerText('progress', { issue: it.issue, step: 'rebased', round: 0, commit: '<new head sha>', pr: it.pr })}`)}
-   - ${it.newBase ? `Retarget the PR if needed: \`gh pr edit ${it.pr} -R ${REPO} --base ${it.newBase}\`.` : 'Leave the PR base as it is.'}
-   - List it in rebased, with the new head sha as headCommit.`).join('\n')
+   - List it in rebased.`).join('\n')
 }
 
-function rebasePrompt(intro, items, extra) {
+function rebasePrompt(intro, items) {
   return `You are the rebaser for a /build run on spec issue #${SPEC}. ${intro}
 
 ${WORKTREE_RULES}
 
 ## Steps
-${extra || ''}${rebaseSteps(items)}
+${rebaseSteps(items)}
 
-Return rebased, conflicts, verifyFailed, and mergedParents (issue numbers; [] unless asked).`
+Return rebased, conflicts, and verifyFailed (issue numbers).`
 }
 
 async function handleRebaseResult(res, items, phaseName) {
-  for (const r of res.rebased) {
-    rebasedHeads.set(r.issue, r.headCommit)
-    const iss = issues.get(r.issue)
-    if (iss && iss.pr) iss.pr.headRefOid = r.headCommit
-  }
   for (const c of res.conflicts) {
     const it = items.find(x => x.issue === c.issue)
     await postBlocker(c.issue, {
@@ -912,53 +896,48 @@ async function handleRebaseResult(res, items, phaseName) {
   }
 }
 
-// At startup: stacked PRs whose parent PR has merged get rebased onto the default branch.
-async function rebaseOntoMergedParents() {
-  const items = []
-  for (const n of S.order) {
-    const iss = issues.get(n)
-    if (!iss.pr || iss.pr.state !== 'OPEN') continue
-    for (const p of parentsOf(n)) {
-      const pp = issues.get(p).pr
-      if (pp && pp.merged && pp.headRefOid) {
-        items.push({ issue: n, branch: branchOf(n), pr: iss.pr.number, oldBase: pp.headRefOid, onto: `origin/${DEFAULT}`, newBase: DEFAULT, expectHead: iss.pr.headRefOid })
-        break
-      }
-    }
-  }
-  if (!items.length) return
-  const res = await call('#spec rebaser', rebasePrompt(`These PRs were stacked on a parent PR that has since merged. Rebase each onto \`${DEFAULT}\`.`, items), {
-    schema: REBASE_SCHEMA, model: MODEL.rebaser, phase: 'Startup',
-  })
-  await handleRebaseResult(res, items, 'Startup')
+const PARENT_CHECK_SCHEMA = {
+  type: 'object',
+  required: ['merged', 'notMergeCommit'],
+  properties: { merged: { type: 'array', items: INT }, notMergeCommit: { type: 'array', items: INT } },
 }
 
-// Before each issue: a parent PR may have merged during this run.
+// Before each issue: a parent PR may have merged during this run. In true mode PRs must be merged
+// with merge commits. Then a stacked branch needs no change: its parent's commits are already on
+// the default branch. A squash or rebase merge leaves the stacked branch on commits that the default
+// branch doesn't have. /build doesn't repair that; it stops the issue with a blocker.
 async function checkMergedParents(n, phaseName) {
   const open = parentsOf(n).filter(p => results.get(p).outcome === 'done')
   if (!open.length) return
-  const iss = issues.get(n)
-  const ownBranch = iss.branch && iss.branch.exists && iss.pr && iss.pr.state === 'OPEN'
-  const listing = open.map(p => `- issue #${p}: PR #${results.get(p).pr}, branch \`${branchOf(p)}\``).join('\n')
-  const intro = `Issue #${n} depends on these open parent PRs:
+  const listing = open.map(p => `- issue #${p}: PR #${results.get(p).pr}`).join('\n')
+  const res = await call(`#${n} git`, gitPrompt(`Check the parent PRs of issue #${n}:
 ${listing}
-First check each one: \`gh pr view <number> -R ${REPO} --json state,headRefOid\`. List the merged ones in mergedParents.`
-  const items = []
-  if (ownBranch) {
-    for (const p of open) {
-      items.push({ issue: n, branch: branchOf(n), pr: iss.pr.number, oldBase: `<headRefOid of PR #${results.get(p).pr}>`, onto: `origin/${DEFAULT}`, newBase: DEFAULT, expectHead: iss.pr.headRefOid })
-    }
-  }
-  const extra = items.length
-    ? `Only for a parent that is merged, do the matching step below for issue #${n}'s branch (use that parent PR's headRefOid as the old base). Skip the steps for parents that are still open.\n`
-    : 'If no parent is merged, or issue #' + n + ' has no branch yet, there is nothing else to do.\n'
-  const res = await call(`#${n} rebaser`, rebasePrompt(intro, items, extra), { schema: REBASE_SCHEMA, model: MODEL.rebaser, phase: phaseName })
-  for (const m of res.mergedParents) {
+1. \`git -C ${WT} fetch origin\`.
+2. For each PR: \`gh pr view <number> -R ${REPO} --json state,headRefOid,mergeCommit\`. If state is MERGED, list its issue in merged.
+3. For each merged one: \`git -C ${WT} rev-list --parents -n 1 <mergeCommit.oid>\`. If headRefOid is not in that line (the PR was squashed or rebased, not merged with a merge commit), also list its issue in notMergeCommit.`,
+  'Return merged and notMergeCommit (issue numbers).'), { schema: PARENT_CHECK_SCHEMA, model: MODEL.git, phase: phaseName })
+  for (const m of res.merged) {
     const r = results.get(m)
     if (r) r.outcome = 'merged'
   }
-  await handleRebaseResult(res, items, phaseName)
-  if (res.conflicts.some(c => c.issue === n)) throw new Blocked(results.get(n).blocker)
+  const iss = issues.get(n)
+  const bad = res.notMergeCommit.filter(p => open.includes(p))
+  // With no branch yet, the issue simply starts from the default branch.
+  if (!bad.length || !(iss.branch && iss.branch.exists)) return
+  await failWithBlocker(n, {
+    type: 1, scope: 'branch',
+    question: badMergeText(bad.map(p => ({ issue: p, pr: results.get(p).pr })), n),
+    options: [
+      `A) Rebase \`${branchOf(n)}\` onto \`${DEFAULT}\` by hand (drop the parent's old commits), push, then rerun /build`,
+      `B) Close the PR for issue #${n} and delete its branch, so /build rebuilds it from \`${DEFAULT}\``,
+    ],
+    recommendation: 'A',
+  }, phaseName)
+}
+
+function badMergeText(parents, n) {
+  const list = parents.map(p => `PR #${p.pr} (issue #${p.issue})`).join(', ')
+  return `${list} was merged with squash or rebase. With human-in-loop=true, /build needs stacked PRs merged with merge commits. Branch \`${branchOf(n)}\` still has the parent's original commits, which \`${DEFAULT}\` doesn't have, so its PR would show them again and could conflict.`
 }
 
 // After a rebuilt issue: PRs stacked on it are rebased onto its new head.
@@ -1147,7 +1126,6 @@ async function startup() {
     startOid = v.headCommit
   }
   if (args.isRerun) {
-    if (HIL) await rebaseOntoMergedParents()
     await recheckAnsweredPrs()
   }
 }

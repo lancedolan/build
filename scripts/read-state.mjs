@@ -56,6 +56,7 @@ query($id: ID!, $after: String) {
 
 const PR_FIELDS = `
   id number url state merged mergedAt createdAt baseRefName headRefName headRefOid
+  mergeCommit { oid parents(first: 2) { nodes { oid } } }
   comments(first: 100) { ${PAGE} nodes { ${ISSUE_COMMENT} } }
   reviewThreads(first: 100) { nodes { comments(first: 50) { nodes { databaseId url body createdAt author { login } } } } }`
 
@@ -136,8 +137,35 @@ function shapePr(pr, comments) {
     baseRefName: pr.baseRefName,
     headRefName: pr.headRefName,
     headRefOid: pr.headRefOid,
+    mergedWithMergeCommit: mergedWithMergeCommit(pr),
     findings: computeFindings(all),
   }
+}
+
+// A merge commit has the PR head as a parent. A squash or rebase merge doesn't. null if not merged.
+export function mergedWithMergeCommit(pr) {
+  if (!pr.merged) return null
+  const parents = (pr.mergeCommit && pr.mergeCommit.parents && pr.mergeCommit.parents.nodes) || []
+  return parents.some(p => p.oid === pr.headRefOid)
+}
+
+// A parent PR merged by squash or rebase, while a dependent branch still has the parent's original
+// commits. /build needs merge commits in human-in-loop=true mode and refuses to repair this.
+function findBadMerges(gh, owner, name, issues) {
+  const out = []
+  for (const parent of issues) {
+    if (!parent.pr || parent.pr.mergedWithMergeCommit !== false) continue
+    for (const child of issues) {
+      if (!child.blockedBy.includes(parent.number) || !child.branch.exists) continue
+      if (child.pr && child.pr.merged) continue
+      // "ahead" or "identical": the child branch contains the parent PR's head commit.
+      const status = gh.run(['api', `repos/${owner}/${name}/compare/${parent.pr.headRefOid}...${child.branch.oid}`, '--jq', '.status']).trim()
+      if (status === 'ahead' || status === 'identical') {
+        out.push({ issue: parent.number, pr: parent.pr.number, dependent: child.number, branch: child.branch.name })
+      }
+    }
+  }
+  return out
 }
 
 // gh: from makeGh(). Returns the state object.
@@ -249,6 +277,7 @@ export async function readState(gh, { repo, spec }) {
     issues: graph.order.filter(n => byNum.has(n)).map(n => byNum.get(n)),
     order: graph.order,
     graphErrors,
+    badMerges: findBadMerges(gh, owner, name, issues),
   }
 }
 

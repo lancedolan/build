@@ -115,6 +115,13 @@ export function runChecks({ state, humanInLoop, settingsList, env, ghAuthOk, ghA
     refusals.push(`AUTO-DELETE OF HEAD BRANCHES IS OFF in ${state.repo}. human-in-loop=true stacks PRs on each other. Without auto-delete, a stacked PR stays targeted at its merged parent's branch, and merging it never reaches ${state.defaultBranch || 'the default branch'}, with no error. Turn on Settings → General → "Automatically delete head branches", or run \`gh repo edit ${state.repo} --delete-branch-on-merge\`.`)
   }
 
+  // 7. true mode needs stacked PRs merged with merge commits.
+  if (state && humanInLoop) {
+    for (const b of state.badMerges || []) {
+      refusals.push(`PR MERGED WITHOUT A MERGE COMMIT: PR #${b.pr} (issue #${b.issue}) was merged with squash or rebase, and branch ${b.branch} (issue #${b.dependent}) still has its original commits. human-in-loop=true needs stacked PRs merged with merge commits. Fix it by hand: rebase ${b.branch} onto ${state.defaultBranch} without PR #${b.pr}'s old commits and push, or close issue #${b.dependent}'s PR and delete its branch so /build rebuilds it.`)
+    }
+  }
+
   return { ok: refusals.length === 0, refusals, warnings }
 }
 

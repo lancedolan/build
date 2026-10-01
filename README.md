@@ -39,7 +39,7 @@ Run these from a checkout of the target repo:
 
 When the run ends, the chat shows each issue's result and each blocker with its options. To answer a blocker, reply in chat, for example `#43: B`. Claude posts it as a `Decision:` comment and reruns `/build`. You can also post the `Decision:` comment yourself from anywhere and rerun later. All state lives on GitHub.
 
-Rerun `/build 40` after merging some PRs. It rebases stacked PRs whose parent has merged.
+Rerun `/build 40` after merging some PRs. Merge stacked PRs with **merge commits** (not squash or rebase), bottom of the stack first. A squash or rebase merge leaves the PRs stacked on it with commits the default branch doesn't have; /build refuses to run until you fix that by hand.
 
 ## Development
 

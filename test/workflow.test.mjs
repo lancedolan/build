@@ -32,9 +32,10 @@ function defaultResult(label, prompt) {
   }
   if (role.startsWith('review:')) return { findings: [], verdicts: [], ...common() }
   if (role === 'merger') return { merged: true, mergeCommit: `merge${n}`, error: '' }
-  if (role === 'rebaser') return { rebased: [], conflicts: [], mergedParents: [], verifyFailed: [] }
+  if (role === 'rebaser') return { rebased: [], conflicts: [], verifyFailed: [] }
   if (role === 'recheck') return { affected: [], ...common() }
   if (role === 'git') {
+    if (prompt.includes('Check the parent PRs')) return { merged: [], notMergeCommit: [] }
     if (n === 'spec') return prompt.includes('Final PR for spec') ? { ok: true, error: '', prNumber: 900 } : { ok: true, error: '' }
     return { ok: true, error: '', prNumber: 100 + Number(n), prUrl: `https://x/pull/${100 + Number(n)}` }
   }
@@ -122,7 +123,7 @@ test('happy path, 2 issues, humanInLoop true: the second PR stacks on the first 
     '#spec start-verifier',
     '#41 scout', '#41 test-writer', '#41 implementer r0', '#41 verifier r0 c1', '#41 git',
     '#41 review:build:fallback-reviewer r1', '#41 git',
-    '#42 rebaser',
+    '#42 git',
     '#42 scout', '#42 test-writer', '#42 implementer r0', '#42 verifier r0 c1', '#42 git',
     '#42 review:build:fallback-reviewer r1', '#42 git',
   ])
@@ -138,7 +139,7 @@ test('happy path, 2 issues, humanInLoop true: the second PR stacks on the first 
   // #42 starts from #41's branch and its PR targets it.
   const tw = callFor(calls, '#42 test-writer').prompt
   assert.match(tw, /checkout -b build\/40-42 origin\/build\/40-41/)
-  const publish = calls.filter(c => c.label === '#42 git')[0].prompt
+  const publish = calls.filter(c => c.label === '#42 git')[1].prompt
   assert.match(publish, /--base build\/40-41/)
   assert.match(publish, /Stacked on PR #141 \(`build\/40-41`\)/)
   // #41's PR targets main.
@@ -160,12 +161,12 @@ test('diamond: C depends on unmerged A and B', async () => {
   const tw = callFor(calls, '#43 test-writer').prompt
   assert.match(tw, /checkout -b build\/40-43 origin\/build\/40-42/)
   assert.match(tw, /Merge `origin\/build\/40-41` into it with a merge commit/)
-  const body = calls.filter(c => c.label === '#43 git')[0].prompt
+  const body = calls.filter(c => c.label === '#43 git')[1].prompt
   assert.match(body, /--base build\/40-42/)
   assert.match(body, /Merge order: #141 \(issue #41\), then #142 \(issue #42\), then this PR\./)
   assert.match(body, /its diff also includes the changes from #141/)
-  // The rebaser checks both open parents before #43 starts.
-  assert.match(callFor(calls, '#43 rebaser').prompt, /issue #41: PR #141[\s\S]*issue #42: PR #142/)
+  // Both open parents are checked before #43 starts.
+  assert.match(callFor(calls, '#43 git').prompt, /issue #41: PR #141[\s\S]*issue #42: PR #142/)
 })
 
 test('humanInLoop false: merges into the spec branch, then opens the final PR', async () => {
@@ -174,7 +175,7 @@ test('humanInLoop false: merges into the spec branch, then opens the final PR', 
   assert.match(calls[0].prompt, /refs\/heads\/build\/40-spec/)
   assert.equal(labels[1], '#spec start-verifier')
   assert.match(calls[1].prompt, /origin\/build\/40-spec/)
-  assert.ok(!labels.some(l => l.endsWith('rebaser')), 'no stacked rebases in false mode')
+  assert.ok(!calls.some(c => c.prompt.includes('Check the parent PRs')), 'no parent checks in false mode')
   assert.ok(labels.indexOf('#41 merger') < labels.indexOf('#42 scout'), 'parent merged before the child starts')
   const r = byNum(out)
   assert.deepEqual([r[41].outcome, r[41].base, r[42].outcome, r[42].base], ['merged', 'build/40-spec', 'merged', 'build/40-spec'])
@@ -292,14 +293,14 @@ test('every agent label matches the contract format', async () => {
       if (l === '#41 verifier r1 c1') return fail
       return undefined
     }),
-    // Rerun: recheck and startup rebase.
+    // Rerun: recheck.
     run(makeArgs([
       issue(41, { state: 'OPEN', status: 'merged', pr: { number: 141, state: 'MERGED', merged: true, baseRefName: 'main', headRefName: 'build/40-41', headRefOid: 'p41', findings: [] } }),
       issue(42, { blockedBy: [41], status: 'done', markers: [{ type: 'done', data: { issue: 42, pr: 142 }, createdAt: '2026-01-02T00:00:00Z' }], branch: { name: 'build/40-42', exists: true, oid: 'o42' }, pr: { number: 142, state: 'OPEN', merged: false, baseRefName: 'build/40-41', headRefName: 'build/40-42', headRefOid: 'o42', findings: [] } }),
     ], { isRerun: true, spec: { decisions: [{ body: 'Decision: A', createdAt: '2026-01-03T00:00:00Z', author: 'u' }] } })),
   ]
   for (const r of await Promise.all(runs)) all.push(...r.labels)
-  for (const want of ['#spec recheck', '#spec rebaser', '#41 implementer r1', '#41 verifier r1 c1', '#41 implementer r1 c1', '#41 git r1', '#41 merger']) {
+  for (const want of ['#spec recheck', '#41 implementer r1', '#41 verifier r1 c1', '#41 implementer r1 c1', '#41 git r1', '#41 merger']) {
     assert.ok(all.includes(want), `covers ${want}`)
   }
   for (const l of all) assert.match(l, LABEL_RE, `label "${l}"`)
@@ -481,62 +482,52 @@ test('an argued finding that still stands is shown to the implementer as argued 
   assert.equal(byNum(out)[41].outcome, 'done')
 })
 
-// ---------- fix: the verifier's diff base after a rebase ----------
+// ---------- a parent PR merges during the run ----------
 
-// #42 is stacked on #41, whose PR merged. #42 crashed after its push, before the PR marker.
-function stackedOnMerged(markers42) {
+// #41's PR is open at the start. #42 is stacked on it and crashed after its push.
+function stackedOnOpen(branch42 = true) {
   return [
-    issue(41, { status: 'merged', pr: { number: 141, state: 'MERGED', merged: true, baseRefName: 'main', headRefName: 'build/40-41', headRefOid: 'p41', findings: [] } }),
-    issue(42, {
-      blockedBy: [41], status: 'interrupted', markers: markers42,
-      branch: { name: 'build/40-42', exists: true, oid: 'pushed42' },
-      pr: { number: 142, state: 'OPEN', merged: false, baseRefName: 'build/40-41', headRefName: 'build/40-42', headRefOid: 'pushed42', findings: [] },
+    issue(41, {
+      status: 'done', markers: [{ type: 'done', data: { issue: 41, pr: 141 }, createdAt: '2026-01-01T00:00:00Z' }],
+      branch: { name: 'build/40-41', exists: true, oid: 'p41' },
+      pr: { number: 141, state: 'OPEN', merged: false, baseRefName: 'main', headRefName: 'build/40-41', headRefOid: 'p41', findings: [] },
     }),
+    branch42
+      ? issue(42, {
+        blockedBy: [41], status: 'interrupted',
+        markers: [
+          { type: 'progress', data: { issue: 42, step: 'tests-committed', round: 0, commit: 'tests42', pr: null }, createdAt: '2026-01-01T00:00:00Z' },
+          { type: 'progress', data: { issue: 42, step: 'code-pushed', round: 0, commit: 'pushed42', pr: null }, createdAt: '2026-01-01T01:00:00Z' },
+        ],
+        branch: { name: 'build/40-42', exists: true, oid: 'pushed42' },
+        pr: { number: 142, state: 'OPEN', merged: false, baseRefName: 'build/40-41', headRefName: 'build/40-42', headRefOid: 'pushed42', findings: [] },
+      })
+      : issue(42, { blockedBy: [41] }),
   ]
 }
-const pushed42 = [
-  { type: 'progress', data: { issue: 42, step: 'tests-committed', round: 0, commit: 'tests42', pr: null }, createdAt: '2026-01-01T00:00:00Z' },
-  { type: 'progress', data: { issue: 42, step: 'code-pushed', round: 0, commit: 'pushed42', pr: null }, createdAt: '2026-01-01T01:00:00Z' },
-]
+const parentCheck = res => (l, prompt) => (prompt.includes('Check the parent PRs') ? res : undefined)
 
-test('after a startup rebase, the verifier diffs tests from the rebased commit', async () => {
-  const { calls } = await run(makeArgs(stackedOnMerged(pushed42), { isRerun: true }), (l) => {
-    if (l === '#spec rebaser') return { rebased: [{ issue: 42, headCommit: 'rebased42' }], conflicts: [], mergedParents: [], verifyFailed: [] }
-    return undefined
-  })
-  const rb = callFor(calls, '#spec rebaser').prompt
-  // The rebaser records the new commit on the issue, so a later rerun also diffs from it.
-  assert.match(rb, /Post this comment on issue #42[\s\S]*build:progress \{"issue":42,"step":"rebased","round":0,"commit":"<new head sha[^"]*","pr":142\}/)
-  const v = callFor(calls, '#42 verifier r0 c1').prompt
-  assert.match(v, /diff --stat rebased42 HEAD/)
-  assert.doesNotMatch(v, /diff --stat pushed42/)
+test('parent merged with a merge commit: the stacked branch is used as is, no rebase', async () => {
+  const { out, calls, labels } = await run(makeArgs(stackedOnOpen(), { isRerun: true }), parentCheck({ merged: [41], notMergeCommit: [] }))
+  assert.ok(!labels.some(l => l.endsWith('rebaser')))
+  assert.match(callFor(calls, '#42 verifier r0 c1').prompt, /diff --stat pushed42 HEAD/)
+  assert.equal(byNum(out)[41].outcome, 'merged')
+  assert.equal(byNum(out)[42].outcome, 'done')
 })
 
-test('after a rebase inside the run, the verifier diffs tests from the rebased commit', async () => {
-  const issues = stackedOnMerged(pushed42)
-  // #41's PR is still open at the start and merges while the run goes.
-  issues[0] = issue(41, {
-    status: 'done', markers: [{ type: 'done', data: { issue: 41, pr: 141 }, createdAt: '2026-01-01T00:00:00Z' }],
-    branch: { name: 'build/40-41', exists: true, oid: 'p41' },
-    pr: { number: 141, state: 'OPEN', merged: false, baseRefName: 'main', headRefName: 'build/40-41', headRefOid: 'p41', findings: [] },
-  })
-  const { calls } = await run(makeArgs(issues, { isRerun: true }), (l) => {
-    if (l === '#42 rebaser') return { rebased: [{ issue: 42, headCommit: 'rebased42' }], conflicts: [], mergedParents: [41], verifyFailed: [] }
-    return undefined
-  })
-  assert.match(callFor(calls, '#42 verifier r0 c1').prompt, /diff --stat rebased42 HEAD/)
+test('parent squash-merged under an existing branch: the issue stops with a blocker', async () => {
+  const { out, calls, labels } = await run(makeArgs(stackedOnOpen(), { isRerun: true }), parentCheck({ merged: [41], notMergeCommit: [41] }))
+  assert.ok(!labels.includes('#42 scout'), 'no work on the branch')
+  const r = byNum(out)[42]
+  assert.equal(r.outcome, 'blocked')
+  assert.equal(r.blocker.type, 1)
+  assert.match(r.blocker.question, /PR #141 \(issue #41\) was merged with squash or rebase/)
+  const posted = calls.filter(c => c.label === '#42 git')[1].prompt
+  assert.match(posted, /build:blocker \{"issue":42,"type":1/)
 })
 
-test('resume after a posted rebase marker: the diff starts at the rebased commit, the step is unchanged', async () => {
-  const markers = [...pushed42, { type: 'progress', data: { issue: 42, step: 'rebased', round: 0, commit: 'rebased42', pr: 142 }, createdAt: '2026-01-01T02:00:00Z' }]
-  const issues = stackedOnMerged(markers)
-  issues[0] = issue(41, { status: 'merged', pr: { number: 141, state: 'MERGED', merged: true, baseRefName: 'main', headRefName: 'build/40-41', headRefOid: 'p41', findings: [] } })
-  issues[1].pr.baseRefName = 'main'
-  const { calls, labels } = await run(makeArgs(issues, { isRerun: true }), (l) => {
-    // The startup rebaser finds nothing to do: the branch no longer has p41.
-    if (l === '#spec rebaser') return { rebased: [], conflicts: [], mergedParents: [], verifyFailed: [] }
-    return undefined
-  })
-  assert.ok(!labels.includes('#42 test-writer') && !labels.includes('#42 implementer r0'), 'still resumes after code-pushed')
-  assert.match(callFor(calls, '#42 verifier r0 c1').prompt, /diff --stat rebased42 HEAD/)
+test('parent squash-merged before the issue has a branch: it starts from main', async () => {
+  const { out, calls } = await run(makeArgs(stackedOnOpen(false), { isRerun: true }), parentCheck({ merged: [41], notMergeCommit: [41] }))
+  assert.match(callFor(calls, '#42 test-writer').prompt, /origin\/main/)
+  assert.equal(byNum(out)[42].base, 'main')
 })

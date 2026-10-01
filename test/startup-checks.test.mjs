@@ -160,3 +160,10 @@ test('main: --state reads a state file instead of gh', async () => {
 test('main: bad --human-in-loop value is a usage error', async () => {
   await assert.rejects(main(['--spec', '40', '--repo-dir', '/r', '--human-in-loop', 'maybe'], { gh: fixtureGh(clone(loadJson('gh-spec40.json'))), env: {}, fs: memFs(), home: '/h' }), /must be true or false/)
 })
+
+test('true mode refuses a squash or rebase merge under a stacked branch', async () => {
+  const state = { ...(await spec40State()), badMerges: [{ issue: 41, pr: 46, dependent: 42, branch: 'build/40-42' }] }
+  const r = runChecks(base(state))
+  assert.equal(r.ok, false)
+  assert.match(r.refusals[0], /PR MERGED WITHOUT A MERGE COMMIT: PR #46 \(issue #41\).*build\/40-42 \(issue #42\)/)
+})

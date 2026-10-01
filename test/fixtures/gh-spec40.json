@@ -314,6 +314,19 @@
         "baseRefName": "main",
         "headRefName": "build/40-41",
         "headRefOid": "head46",
+        "mergeCommit": {
+          "oid": "merge46",
+          "parents": {
+            "nodes": [
+              {
+                "oid": "main-before46"
+              },
+              {
+                "oid": "head46"
+              }
+            ]
+          }
+        },
         "comments": {
           "pageInfo": {
             "hasNextPage": false,

@@ -200,3 +200,23 @@ test('main resolves the repo from --repo-dir', async () => {
   const { output } = await main(['--spec', '40', '--repo-dir', '/tmp/x'], fixtureGh(spec40()))
   assert.equal(output.repo, 'acme/shop')
 })
+
+test('a squash-merged parent whose commits are still on a dependent branch is a bad merge', async () => {
+  const fx = spec40()
+  // PR #46 (issue #41) squashed: the merge commit's only parent is the old main.
+  fx.prs['build/40-41'][0].mergeCommit.parents.nodes = [{ oid: 'main-before46' }]
+  fx.compare = { 'head46...oid42': 'ahead' }
+  let s = await readState(fixtureGh(fx), { repo: 'acme/shop', spec: 40 })
+  assert.equal(s.issues.find(i => i.number === 41).pr.mergedWithMergeCommit, false)
+  assert.deepEqual(s.badMerges, [{ issue: 41, pr: 46, dependent: 42, branch: 'build/40-42' }])
+  // After a hand rebase the branch no longer has head46.
+  fx.compare = { 'head46...oid42': 'diverged' }
+  s = await readState(fixtureGh(fx), { repo: 'acme/shop', spec: 40 })
+  assert.deepEqual(s.badMerges, [])
+})
+
+test('a merge-commit merge is not a bad merge and needs no compare call', async () => {
+  const s = await readState(fixtureGh(spec40()), { repo: 'acme/shop', spec: 40 })
+  assert.equal(s.issues.find(i => i.number === 41).pr.mergedWithMergeCommit, true)
+  assert.deepEqual(s.badMerges, [])
+})
