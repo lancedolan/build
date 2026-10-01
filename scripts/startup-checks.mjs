@@ -49,6 +49,22 @@ function effective(settingsList, key) {
   return { value, from }
 }
 
+const HANDS_OFF_MODES = ['auto', 'bypassPermissions']
+
+// permissions.defaultMode, later files winning.
+function effectivePermissionMode(settingsList) {
+  let value
+  let from = null
+  for (const s of settingsList) {
+    const m = s.settings && s.settings.permissions && s.settings.permissions.defaultMode
+    if (m) {
+      value = m
+      from = s.path
+    }
+  }
+  return { value, from }
+}
+
 // Pure: every input is passed in. Returns {ok, refusals, warnings}.
 export function runChecks({ state, humanInLoop, settingsList, env, ghAuthOk, ghAuthError }) {
   const refusals = []
@@ -68,6 +84,13 @@ export function runChecks({ state, humanInLoop, settingsList, env, ghAuthOk, ghA
   const autoContinue = effective(settingsList, 'autoContinueAtUsageLimit')
   if (autoContinue.value !== true) {
     warnings.push('autoContinueAtUsageLimit is not on. If the run hits your usage limit, agents fail instead of waiting for the reset, and the run stops with the current issue marked interrupted. Rerun /build after the reset to resume.')
+  }
+
+  // 2b. Workflow agents run git, gh, node, and test commands. In a mode that asks for approval,
+  // those calls are denied or wait on a prompt, so the run can't work unattended.
+  const mode = effectivePermissionMode(settingsList)
+  if (!HANDS_OFF_MODES.includes(mode.value)) {
+    refusals.push(`PERMISSION MODE ASKS FOR APPROVAL: ${mode.value ? `"defaultMode": "${mode.value}" in ${mode.from}` : 'no permissions.defaultMode is set, so Claude Code asks before running commands'}. /build's workflow agents run git, gh, node, and the repo's test commands with no one there to approve them. Set "permissions": {"defaultMode": "auto"} (or "bypassPermissions") in ~/.claude/settings.json or the repo's .claude/settings.local.json.`)
   }
 
   // 3. gh must be logged in and able to write.

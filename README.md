@@ -23,6 +23,7 @@ claude plugin install build@lancedolan-build
 ## Setup before first use
 
 - Turn on dynamic workflows. In Claude Code, run `/config` and turn on "Dynamic workflows". Make sure `disableWorkflows` isn't `true` in any settings file and `CLAUDE_CODE_DISABLE_WORKFLOWS` isn't set.
+- Set `"permissions": {"defaultMode": "auto"}` (or `"bypassPermissions"`) in `~/.claude/settings.json` or the repo's `.claude/settings.local.json`. Workflow agents run `git`, `gh`, `node`, and test commands with no one there to approve them. In a mode that asks first, those commands are denied, so /build refuses to start.
 - Turn on `autoContinueAtUsageLimit` in your Claude Code settings. Then a run waits for a usage limit to reset instead of stopping.
 - Log in to `gh` with an account that can write to the target repo.
 - For `human-in-loop=true` (the default): turn on "Automatically delete head branches" in the repo's GitHub settings. Without it, a stacked PR keeps targeting its merged parent's branch, and merging it never reaches the main branch.

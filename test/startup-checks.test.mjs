@@ -7,7 +7,8 @@ import { makeGh } from '../scripts/lib/gh.mjs'
 
 const spec40State = async () => readState(fixtureGh(clone(loadJson('gh-spec40.json'))), { repo: 'acme/shop', spec: 40 })
 const settings = (obj, path = '/home/.claude/settings.json') => [{ path, settings: obj }]
-const goodSettings = settings({ autoContinueAtUsageLimit: true })
+const AUTO = { permissions: { defaultMode: 'auto' } }
+const goodSettings = settings({ autoContinueAtUsageLimit: true, ...AUTO })
 const base = state => ({ state, humanInLoop: true, settingsList: goodSettings, env: {}, ghAuthOk: true })
 
 test('a clean true-mode run passes with no warnings', async () => {
@@ -17,13 +18,13 @@ test('a clean true-mode run passes with no warnings', async () => {
 
 test('disableWorkflows in settings refuses, and a later file wins', async () => {
   const state = await spec40State()
-  let r = runChecks({ ...base(state), settingsList: settings({ disableWorkflows: true, autoContinueAtUsageLimit: true }) })
+  let r = runChecks({ ...base(state), settingsList: settings({ disableWorkflows: true, autoContinueAtUsageLimit: true, ...AUTO }) })
   assert.equal(r.ok, false)
   assert.match(r.refusals[0], /WORKFLOWS ARE TURNED OFF.*disableWorkflows/)
   r = runChecks({
     ...base(state),
     settingsList: [
-      { path: 'user', settings: { disableWorkflows: true, autoContinueAtUsageLimit: true } },
+      { path: 'user', settings: { disableWorkflows: true, autoContinueAtUsageLimit: true, ...AUTO } },
       { path: 'project', settings: { disableWorkflows: false } },
     ],
   })
@@ -38,7 +39,7 @@ test('CLAUDE_CODE_DISABLE_WORKFLOWS refuses', async () => {
 })
 
 test('autoContinueAtUsageLimit off is a warning only', async () => {
-  const r = runChecks({ ...base(await spec40State()), settingsList: [] })
+  const r = runChecks({ ...base(await spec40State()), settingsList: settings(AUTO) })
   assert.equal(r.ok, true)
   assert.equal(r.warnings.length, 1)
   assert.match(r.warnings[0], /autoContinueAtUsageLimit/)
@@ -133,7 +134,7 @@ test('false mode with PRs into the spec branch passes', async () => {
 
 test('main: reads settings and gh, exits 1 on refusal', async () => {
   const fx = clone(loadJson('gh-spec40.json'))
-  const fs = memFs({ '/h/.claude/settings.json': JSON.stringify({ autoContinueAtUsageLimit: true }) })
+  const fs = memFs({ '/h/.claude/settings.json': JSON.stringify({ autoContinueAtUsageLimit: true, ...AUTO }) })
   const ok = await main(['--spec', '40', '--repo-dir', '/r'], { gh: fixtureGh(fx), env: {}, fs, home: '/h' })
   assert.equal(ok.exitCode, 0)
   assert.equal(ok.output.ok, true)
@@ -146,12 +147,12 @@ test('main: gh auth failure refuses without reading state', async () => {
   const gh = makeGh(args => (args[0] === 'auth' ? { status: 1, stdout: '', stderr: 'You are not logged in' } : assert.fail(`unexpected gh ${args}`)))
   const r = await main(['--spec', '40', '--repo-dir', '/r'], { gh, env: {}, fs: memFs(), home: '/h' })
   assert.equal(r.exitCode, 1)
-  assert.match(r.output.refusals[0], /You are not logged in/)
+  assert.ok(r.output.refusals.some(x => /You are not logged in/.test(x)))
 })
 
 test('main: --state reads a state file instead of gh', async () => {
   const state = await spec40State()
-  const fs = memFs({ '/s.json': JSON.stringify(state), '/h/.claude/settings.json': '{"autoContinueAtUsageLimit":true}' })
+  const fs = memFs({ '/s.json': JSON.stringify(state), '/h/.claude/settings.json': JSON.stringify({ autoContinueAtUsageLimit: true, ...AUTO }) })
   const gh = makeGh(args => (args[0] === 'auth' ? { status: 0, stdout: '', stderr: '' } : assert.fail(`unexpected gh ${args}`)))
   const r = await main(['--spec', '40', '--repo-dir', '/r', '--state', '/s.json'], { gh, env: {}, fs, home: '/h' })
   assert.equal(r.output.ok, true)
@@ -166,4 +167,18 @@ test('true mode refuses a squash or rebase merge under a stacked branch', async 
   const r = runChecks(base(state))
   assert.equal(r.ok, false)
   assert.match(r.refusals[0], /PR MERGED WITHOUT A MERGE COMMIT: PR #46 \(issue #41\).*build\/40-42 \(issue #42\)/)
+})
+
+test('a permission mode that asks for approval refuses; auto and bypass pass; later files win', async () => {
+  const state = await spec40State()
+  const check = list => runChecks({ ...base(state), settingsList: list })
+  let r = check(settings({ autoContinueAtUsageLimit: true }))
+  assert.equal(r.ok, false)
+  assert.match(r.refusals[0], /PERMISSION MODE ASKS FOR APPROVAL: no permissions.defaultMode is set/)
+  r = check([
+    { path: 'user', settings: { autoContinueAtUsageLimit: true, ...AUTO } },
+    { path: 'project', settings: { permissions: { defaultMode: 'acceptEdits' } } },
+  ])
+  assert.match(r.refusals[0], /"defaultMode": "acceptEdits" in project/)
+  assert.equal(check(settings({ autoContinueAtUsageLimit: true, permissions: { defaultMode: 'bypassPermissions' } })).ok, true)
 })
