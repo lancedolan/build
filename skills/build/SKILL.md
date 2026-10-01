@@ -21,6 +21,7 @@ If you don't have the Workflow tool, stop and print in capitals: `REFUSED: dynam
 
 1. `MAIN=$(git rev-parse --show-toplevel)`. `REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)`. `DIR=~/.claude/build/<owner>-<repo>-<spec>` (owner and repo from `REPO`). `mkdir -p "$DIR"`.
 2. `node ${CLAUDE_PLUGIN_ROOT}/scripts/read-state.mjs --spec <spec> --repo-dir "$MAIN" > "$DIR/state.json"`
+   - Its output goes to the file, so check the exit code. Non-zero: print the `error` field of `$DIR/state.json` word for word and stop.
 3. `node ${CLAUDE_PLUGIN_ROOT}/scripts/startup-checks.mjs --spec <spec> --human-in-loop <mode> --repo-dir "$MAIN" --state "$DIR/state.json"`
    - Print every warning.
    - If `refusals` is non-empty, print each one loudly (prefix `REFUSED:`) and stop. Do not start any agent.

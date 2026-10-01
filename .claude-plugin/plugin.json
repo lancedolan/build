@@ -1,6 +1,6 @@
 {
   "name": "build",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Work a spec issue's graph of sub-issues into one PR per sub-issue: tests first, full verification, adversarial review, and a report on the spec issue.",
   "author": { "name": "Lance Dolan" },
   "repository": "https://github.com/lancedolan/build",

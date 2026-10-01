@@ -158,6 +158,13 @@ test('main: --state reads a state file instead of gh', async () => {
   assert.equal(r.output.ok, true)
 })
 
+test('main: a --state file holding a read-state error repeats that error', async () => {
+  const fs = memFs({ '/s.json': JSON.stringify({ error: 'gh api graphql failed: too many nodes' }) })
+  const gh = makeGh(() => ({ status: 0, stdout: '', stderr: '' }))
+  await assert.rejects(main(['--spec', '40', '--repo-dir', '/r', '--state', '/s.json'], { gh, env: {}, fs, home: '/h' }),
+    /read-state\.mjs failed: gh api graphql failed: too many nodes/)
+})
+
 test('main: bad --human-in-loop value is a usage error', async () => {
   await assert.rejects(main(['--spec', '40', '--repo-dir', '/r', '--human-in-loop', 'maybe'], { gh: fixtureGh(clone(loadJson('gh-spec40.json'))), env: {}, fs: memFs(), home: '/h' }), /must be true or false/)
 })

@@ -169,7 +169,11 @@ export async function main(argv, deps = {}) {
 
   const auth = gh.tryRun(['auth', 'status'])
   let state = null
-  if (values.state) state = JSON.parse(fs.read(values.state))
+  if (values.state) {
+    state = JSON.parse(fs.read(values.state))
+    // read-state.mjs writes {"error": "..."} when it fails. Show that error, not a crash on a missing field.
+    if (state.error) throw new Error(`read-state.mjs failed: ${state.error}`)
+  }
   else if (auth.ok) state = await readState(gh, { repo: await resolveRepo(gh, values['repo-dir']), spec: values.spec })
 
   const settingsList = loadSettings(settingsPaths({ home, configDir: env.CLAUDE_CONFIG_DIR, repoDir: values['repo-dir'] }), fs)
